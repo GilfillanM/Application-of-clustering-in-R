@@ -1,0 +1,851 @@
+---
+title: "STK 795 Application Moon dataset"
+author: "Michelle Gilfillan"
+date: "15 July 2019"
+output: html_document
+---
+
+#Import and install packages:
+```{r}
+
+pkgs <- c("factoextra",  "NbClust", "cluster", "mixtools", "psycho", "gtools")
+install.packages(pkgs)
+library(NbClust)
+library(factoextra)
+library(cluster)
+library(mixtools)
+library(psycho)
+library(gtools)
+
+```
+
+
+#Import, standardise and plot the Moons data set:
+```{r}
+# Standardise the moon data set
+
+
+moon.dataset <- read.csv("C:/Users/u1609/Pictures/SEM 2 2019/STK 795/mg-20190516T083043Z-001/moon dataset.csv")
+
+
+moon.dataset <-  psycho::standardize(moon.dataset) 
+
+# Add clustering column to data set
+dd <- moon.dataset[1:600,]
+nrow(dd)
+plot(dd)
+
+ee <- moon.dataset[601:1200,]
+plot(ee)
+
+ff <-moon.dataset[1201:1800,]
+plot(ff)
+
+# Transform to a matrix and add clustering column
+matrix_moon <- as.matrix(moon.dataset)
+clustercol <-rbind(matrix(1, 600, 1),matrix(2, 600, 1),matrix(3, 600, 1))
+moon <- cbind(matrix_moon,clustercol)
+
+# Transform the matrix back to a data frame
+moon.dataset <- as.data.frame(moon)
+
+# Plot the Moon data farme
+plot(moon.dataset$x1,moon.dataset$x2, col=c("red","blue","green")[clustercol], main = "Moon data set", xlab = "x1", ylab = "x2", pch=19)
+
+
+library(ggplot2) 
+ggplot(moon.dataset, aes(x = x1, y = x2, shape=factor(V3),color = factor(V3, labels = c("1", 
+    "2", "3")))) + geom_point() + labs(color = "cluster", shape = "cluster") +
+     scale_colour_manual(values=c("gold2", "yellow2", "black")) +
+     scale_shape_manual(values = c(16,15,17)) +
+     theme_classic()+
+     ggtitle(label="Moon data set") 
+
+ggplot(moon.dataset, aes(x = x1, y = x2, shape=factor(V3),color = factor(V3, labels = c("1", 
+    "2", "3")))) + geom_point() + labs(color = "cluster", shape = "cluster") +
+     scale_colour_manual(values=c("gray28", "grey28", "grey28")) +
+     scale_shape_manual(values = c(16,15,17)) +
+     theme_classic()+
+     ggtitle(label="Moon data set") 
+
+```
+
+# Import, standardise and plot the Generated dataset:
+```{r}
+# generating n datapoints from a mixture of K Gaussians with dimensions d
+# k  : the respective datapoint classes
+# mu : kxd matrix with means
+# sig: kxdxd matrix with dxd covariate matrices
+gen.mix <- function(n, k, mu, sig) {
+  library(MASS)
+  
+  d <- length(mu[1,])  # number of dimensions
+  result <- matrix(rep(NA,n*d), ncol=d)
+  colnames(result) <- paste0("X",1:d)
+  
+  for(i in 1:n) {
+    result[i,] <- mvrnorm(1, mu = mu[k[i],], Sigma=sig[,,k[i]])
+  }
+  
+  result
+}
+
+
+set.seed(101)
+n <- 360
+
+mu <- matrix(c(4.0,6.0,
+               5.0,5.0,
+               6.5,  5), ncol=2, byrow=T)
+
+sigs <- array(rep(NA,2*2*3), c(2,2,3))  # 3D matrix
+sigs[,,1] <- matrix(c(.25,  0,  0,.25), nrow=2, byrow=TRUE)
+sigs[,,2] <- matrix(c(.25,-.21,-.21,.25), nrow=2, byrow=TRUE)
+sigs[,,3] <- matrix(c(.25, .21, .21,.25), nrow=2, byrow=TRUE)
+
+pi <- c(.2,.5,.3) # mixing coeffs
+classes <- sample(1:3, n, replace=TRUE, prob=pi)
+head(classes)
+mydata <- gen.mix(n, classes, mu, sigs)
+head(mydata)
+
+plot(mydata, col=c("green","blue","red")[classes], main = "Generated data set", xlab="X1", ylab="X2", pch=19)
+plot(mydata, col="black", xlab="X1", ylab="X2", pch=19)
+
+q <- as.data.frame(mydata)
+head(q)
+library(ggplot2) 
+ggplot(q, aes(x = X1, y = X2, shape=factor(classes),color = factor(classes, labels = c("1", 
+    "2", "3")))) + geom_point() + labs(color = "cluster", shape = "cluster") +
+     scale_colour_manual(values=c("green", "blue", "red")) +
+     scale_shape_manual(values = c(16,15,17)) +
+     theme_classic()+
+     ggtitle(label="Generated data set")
+```
+
+#Clustering method: K-means clustering: Moon data set
+
+
+##Determining the optimal number of clusters: Moons data set
+```{r}
+# Hubert and Dindex
+res.nbclust<- NbClust(moon.dataset[,1:2], diss = NULL, distance = "euclidean",
+        min.nc = 2, max.nc = 15, method = "kmeans")
+
+# Visualise Hurbert and Dindex
+factoextra::fviz_nbclust(res.nbclust) + theme_minimal()
+
+```
+
+2. The Hubert index is a graphical method of determining the number of clusters. In the plot of Hubert index, we seek a significant knee that    corresponds to a significant increase of the value of the measure i.e the significant peak in Hubert index second differences plot. 
+
+   The D index is a graphical method of determining the number of clusters. In the plot of D index, we seek a significant knee (the 
+   significant peak in Dindex second differences plot) that corresponds to a significant increase of the value of the measure. 
+   
+* Among all indices:                                                
+* 2 proposed 2 as the best number of clusters 
+* 14 proposed 3 as the best number of clusters 
+* 1 proposed 4 as the best number of clusters 
+* 1 proposed 11 as the best number of clusters 
+* 1 proposed 12 as the best number of clusters 
+* 3 proposed 14 as the best number of clusters 
+* 1 proposed 15 as the best number of clusters 
+
+                   ***** Conclusion *****                            
+ 
+* According to the majority rule, the best number of clusters is  3
+
+
+##Visualise the optimal amount of clusters identified: Moons data set
+
+```{r}
+# Visualising the algorithm:
+
+
+# Install packages for the Silhouette Coefficient and k-means clustering
+install.packages("factoextra")
+library(factoextra)
+library(ggplot2)
+library(FactoMineR)
+library(ggplot2)
+
+# kmeans clustering
+km.res <- eclust(moon.dataset[,1:2], "kmeans", k = 3,
+                 nstart = 25, graph = FALSE)
+fviz_cluster(km.res, geom = "point", frame.type = "norm", show.clust.cent = TRUE, ellipse.level = 0.92, main = "K-means clustering on the moon data set") +
+  scale_colour_manual(values = c("blue", "green", "red")) +
+  scale_fill_manual(values = c("blue", "green", "red")) +
+  theme_classic()
+   
+  
+
+
+fviz_silhouette(km.res)
+
+# Silhouette coefficient of observations
+library("cluster")
+sil <- silhouette(km.res$cluster, dist(moon.dataset))
+head(sil[, 1:3], 10)
+
+# Silhouette plot
+plot(sil, main ="Silhouette plot - K-means")
+fviz_silhouette(sil)
+# Default plot
+fviz_silhouette(km.res)
+# Silhouette information
+silinfo <- km.res$silinfo
+names(silinfo)
+# Silhouette widths of each observation
+head(silinfo$widths[, 1:3], 10)
+# Average silhouette width of each cluster
+silinfo$clus.avg.widths
+# The total average (mean of all individual silhouette widths)
+silinfo$avg.width
+# The size of each clusters
+km.res$size
+```
+## Evaluate kmeans clustering with a confusion matrix: Moons data set
+
+```{r}
+table(moon.dataset[,3],km.res$cluster)
+```
+Out of the 1800 observations the algorithm clustered 1724 correctly.
+
+
+#Clustering method: K-means clustering: Generated dataset
+
+
+
+##Determining the optimal number of clusters: Generated data set
+```{r}
+# Hubert and Dindex
+res.nbclust1<- NbClust(mydata[,1:2], diss = NULL, distance = "euclidean",
+        min.nc = 2, max.nc = 15, method = "kmeans")
+
+# Visualise Hurbert and Dindex
+factoextra::fviz_nbclust(res.nbclust1) + theme_minimal()
+
+```
+
+
+
+
+
+
+```{r}
+# Visualising the algorithm method 1:
+#km <- kmeans(mydata,3)
+#km$centers
+#km$cluster
+
+
+#plot(mydata, col=c("red","green","blue")[km$cluster], xlab="X1", ylab="X2", pch=19)
+
+# Visualising the algorithm:
+#k.means.fitted2 <- kmeans(mydata, 3) # k = 3
+#attributes(k.means.fitted2)
+#k.means.fitted2$centers
+#k.means.fitted2$cluster
+#k.means.fitted2$size
+
+#library(cluster)
+#clusplot(mydata, k.means.fitted2$cluster, main='2D representation of the Cluster solution',
+         #color=TRUE, shade=TRUE,
+         #labels=2, lines=0)
+
+
+
+
+# Visualising the algorithm:
+
+
+# Install packages for the Silhouette Coefficient and k-means clustering
+install.packages("factoextra")
+library(factoextra)
+library(ggplot2)
+
+# kmeans clustering
+km.res2 <- eclust(mydata[,1:2], "kmeans", k = 3,
+                 nstart = 25, graph = FALSE)
+fviz_cluster(km.res2, geom = "point", frame.type = "norm", show.clust.cent = TRUE, ellipse.level = 0.92, main = "K-means clustering on the generated data set") +
+  scale_colour_manual(values = c("green", "red", "blue")) +
+  scale_fill_manual(values = c("green", "red", "blue")) +
+  theme_classic()
+
+fviz_silhouette(km.res2)
+
+# Silhouette coefficient of observations
+library("cluster")
+sil2 <- silhouette(km.res2$cluster, dist(mydata))
+head(sil[, 1:3], 10)
+
+# Silhouette plot
+plot(sil2, main ="Silhouette plot - K-means")
+fviz_silhouette(sil2)
+# Default plot
+fviz_silhouette(km.res2)
+# Silhouette information
+silinfo2 <- km.res2$silinfo2
+names(silinfo2)
+# Silhouette widths of each observation
+head(silinfo2$widths[, 1:3], 10)
+# Average silhouette width of each cluster
+silinfo2$clus.avg.widths
+# The total average (mean of all individual silhouette widths)
+silinfo2$avg.width
+# The size of each clusters
+km.res2$size
+```
+
+## Evaluate kmeans clustering with a confusion matrix: Generated dataset
+```{r}
+table(classes,km.res2$cluster)
+```
+The algorithm clustered 311 observation out of the 360 correctly.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#Clustering method: Agglomerative Hierarchical clustering:
+
+## Determine the optimal amount of clusters: Moon data set
+```{r}
+# Hubert and Dindex: Single
+
+single.nbclust<- NbClust(moon.dataset[,1:2], diss = NULL, distance = "euclidean",
+        min.nc = 2, max.nc = 15, method = "single")
+
+# Visualise Hurbert and Dindex
+factoextra::fviz_nbclust(single.nbclust) + theme_minimal()
+```
+
+```{r}
+# Hubert and Dindex: Complete
+complete.nbclust<- NbClust(moon.dataset[,1:2], diss = NULL, distance = "euclidean",
+        min.nc = 2, max.nc = 15, method = "complete")
+
+# Visualise Hurbert and Dindex
+factoextra::fviz_nbclust(complete.nbclust) + theme_minimal()
+```
+
+```{r}
+# Hubert and Dindex: Average
+average.nbclust<- NbClust(moon.dataset[,1:2], diss = NULL, distance = "euclidean",
+        min.nc = 2, max.nc = 15, method = "average")
+
+# Visualise Hurbert and Dindex
+factoextra::fviz_nbclust(average.nbclust
+                         ) + theme_minimal()
+
+```
+
+Single linkage: According to the majority rule, the best number of clusters is  14 
+Complete linkage: According to the majority rule, the best number of clusters is  3
+Average linkage: According to the majority rule, the best number of clusters is  3 
+
+
+
+## Visualise Agglomerative Hierarchical clustering: Moon data set
+
+### Single linkage
+```{r}
+library(factoextra)
+
+# Enhanced hierarchical clustering
+res.hc <- eclust(moon.dataset[,1:2], "hclust", k = 3,
+                method = "single", graph = FALSE) 
+head(res.hc$cluster, 15)
+
+# Dendrogram
+fviz_dend(res.hc, rect = TRUE, show_labels = FALSE) 
+ # Plot
+fviz_cluster(res.hc, geom = "point", ellipse.level = 0.92,main="Agglomerative hierarchical clustering on the moon data set",frame.type = "norm") +
+  scale_colour_manual(values = c("blue", "green", "red")) +
+  scale_fill_manual(values = c("blue", "green", "red")) +
+  theme_classic()
+
+# Default Silhouette plot
+fviz_silhouette(res.hc)
+# Silhouette information
+silinfo <- res.hc$silinfo
+silinfo
+names(silinfo)
+# Silhouette widths of each observation
+head(silinfo$widths[, 1:3], 10)
+# Average silhouette width of each cluster
+silinfo$clus.avg.widths
+# The total average (mean of all individual silhouette widths)
+silinfo$avg.width
+# The size of each clusters
+res.hc$size
+```
+
+## Evaluate hierarchical clustering with a confusion matrix: Moon dataset
+
+## Single linkage
+```{r}
+table(moon.dataset$V3,res.hc$cluster)
+head(moon.dataset)
+head(res.hc)
+```
+ observations clustered correctly out of 1800 observations
+
+
+### Average linkage
+```{r}
+library(factoextra)
+
+# Enhanced hierarchical clustering
+res.hcc <- eclust(moon.dataset[,1:2], "hclust", k = 3,
+                method = "average", graph = FALSE) 
+head(res.hcc$cluster, 15)
+
+# Dendrogram
+fviz_dend(res.hcc, rect = TRUE, show_labels = FALSE) 
+ # Plot
+fviz_cluster(res.hcc, geom = "point", main="Agglomerative hierarchical clustering on the moon data set",frame.type = "norm")
+
+# Default Silhouette plot
+fviz_silhouette(res.hcc)
+# Silhouette information
+silinfoc <- res.hcc$silinfo
+names(silinfoc)
+# Silhouette widths of each observation
+head(silinfoc$widths[, 1:3], 10)
+# Average silhouette width of each cluster
+silinfoc$clus.avg.widths
+# The total average (mean of all individual silhouette widths)
+silinfoc$avg.width
+# The size of each clusters
+res.hcc$size
+```
+
+## Evaluate hierarchical clustering with a confusion matrix: Moon dataset
+
+## Average linkage
+```{r}
+table(moon.dataset[,3],res.hcc$cluster)
+```
+ observations clustered correctly out of 1800 observations
+
+
+### Complete linkage
+```{r}
+library(factoextra)
+
+# Enhanced hierarchical clustering
+res.hca <- eclust(moon.dataset[,1:2], "hclust", k = 3,
+                method = "complete", graph = FALSE) 
+head(res.hca$cluster, 15)
+
+# Dendrogram
+fviz_dend(res.hca, rect = TRUE, show_labels = FALSE) 
+ # Plot
+fviz_cluster(res.hca, geom = "point", main="Agglomerative hierarchical clustering on the moon data set",frame.type = "norm")
+
+# Default Silhouette plot
+fviz_silhouette(res.hca)
+# Silhouette information
+silinfoa <- res.hcc$silinfo
+names(silinfoa)
+# Silhouette widths of each observation
+head(silinfoa$widths[, 1:3], 10)
+# Average silhouette width of each cluster
+silinfoa$clus.avg.widths
+# The total average (mean of all individual silhouette widths)
+silinfoa$avg.width
+# The size of each clusters
+res.hca$size
+```
+
+## Evaluate hierarchical clustering with a confusion matrix: Moon dataset
+
+## Complete linkage
+```{r}
+table(moon.dataset[,3],res.hca$cluster)
+```
+ observations clustered correctly out of 1800 observations
+
+
+
+
+
+
+
+
+
+
+
+## Determine the optimal amount of clusters: Generated data set
+```{r}
+# Hubert and Dindex
+
+single.nbclust12<- NbClust(mydata[,1:2], diss = NULL, distance = "euclidean",
+        min.nc = 2, max.nc = 15, method = "single")
+# Visualise Hurbert and Dindex
+factoextra::fviz_nbclust(single.nbclust12
+                         ) + theme_minimal()
+```
+
+```{r}
+
+# Hubert and Dindex
+complete.nbclust12<- NbClust(mydata[,1:2], diss = NULL, distance = "euclidean",
+        min.nc = 2, max.nc = 15, method = "complete")
+
+# Visualise Hurbert and Dindex
+factoextra::fviz_nbclust(complete.nbclust12
+                         ) + theme_minimal()
+```
+
+```{r}
+# Hubert and Dindex
+average.nbclust1<- NbClust(mydata[,1:2], diss = NULL, distance = "euclidean",
+        min.nc = 2, max.nc = 15, method = "average")
+
+# Visualise Hurbert and Dindex
+factoextra::fviz_nbclust(average.nbclust1
+                         ) + theme_minimal()
+```
+Single linkage: According to the majority rule, the best number of clusters is 11 
+Complete linkage: According to the majority rule, the best number of clusters is 3 
+Average linkage: According to the majority rule, the best number of clusters is 2 
+
+
+## Visualise Hierarchical clustering:
+
+### Single linkage
+```{r}
+# Enhanced hierarchical clustering
+res.hc6 <- eclust(mydata[,1:2], "hclust", k = 3,
+                method = "single", graph = FALSE) 
+head(res.hc6$cluster, 15)
+
+# Dendrogram
+fviz_dend(res.hc6, rect = TRUE, show_labels = FALSE) 
+ # Plot
+fviz_cluster(res.hc6, geom = "point",ellipse.level= 0.92,main = "Agglomerative hierarchical clustering on the generated data set", frame.type = "norm") +
+  scale_colour_manual(values = c("green", "blue", "red")) +
+  scale_fill_manual(values = c("green", "blue", "red")) +
+  theme_classic()
+  
+
+ 
+# Default Silhouette plot
+fviz_silhouette(res.hc6)
+# Silhouette information
+silinfo6 <- res.hc6$silinfo
+names(silinfo6)
+# Silhouette widths of each observation
+head(silinfo6$widths[, 1:3], 10)
+# Average silhouette width of each cluster
+silinfo6$clus.avg.widths
+# The total average (mean of all individual silhouette widths)
+silinfo6$avg.width
+# The size of each clusters
+res.hc6$size
+```
+## Evaluate hierarchical clustering with a confusion matrix: Generated data set
+```{r}
+table(classes,res.hc6$cluster)
+```
+ observations out of the 360 observations are clustered correctly.
+
+### Average linkage
+```{r}
+# Enhanced hierarchical clustering
+res.hc8 <- eclust(mydata[,1:2], "hclust", k = 3,
+                method = "average", graph = FALSE) 
+head(res.hc8$cluster, 15)
+
+# Dendrogram
+fviz_dend(res.hc8, rect = TRUE, show_labels = FALSE) 
+ # Plot
+fviz_cluster(res.hc8, geom = "point",main = "Agglomerative hierarchical clustering on the generated data set", frame.type = "norm")
+
+# Default Silhouette plot
+fviz_silhouette(res.hc8)
+# Silhouette information
+silinfo8 <- res.hc6$silinfo
+names(silinfo8)
+# Silhouette widths of each observation
+head(silinfo8$widths[, 1:3], 10)
+# Average silhouette width of each cluster
+silinfo8$clus.avg.widths
+# The total average (mean of all individual silhouette widths)
+silinfo8$avg.width
+# The size of each clusters
+res.hc8$size
+```
+## Evaluate hierarchical clustering with a confusion matrix: Generated data set
+```{r}
+table(classes,res.hc8$cluster)
+```
+ observations out of the 360 observations are clustered correctly.
+
+
+### Complete linkage
+```{r}
+# Enhanced hierarchical clustering
+res.hc9 <- eclust(mydata[,1:2], "hclust", k = 3,
+                method = "complete", graph = FALSE) 
+head(res.hc9$cluster, 15)
+
+# Dendrogram
+fviz_dend(res.hc9, rect = TRUE, show_labels = FALSE) 
+ # Plot
+fviz_cluster(res.hc9, geom = "point",main = "Agglomerative hierarchical clustering on the generated data set", frame.type = "norm")
+
+# Default Silhouette plot
+fviz_silhouette(res.hc9)
+# Silhouette information
+silinfo9 <- res.hc6$silinfo
+names(silinfo9)
+# Silhouette widths of each observation
+head(silinfo9$widths[, 1:3], 10)
+# Average silhouette width of each cluster
+silinfo9$clus.avg.widths
+# The total average (mean of all individual silhouette widths)
+silinfo9$avg.width
+# The size of each clusters
+res.hc9$size
+```
+## Evaluate hierarchical clustering with a confusion matrix: Generated data set
+```{r}
+table(classes,res.hc9$cluster)
+```
+ observations out of the 360 observations are clustered correctly.
+
+
+
+
+
+
+
+
+
+
+
+
+#Clustering method: Gaussian Mixture Modeling: Moon data set
+```{r}
+library(mixtools)
+
+for (i in 1:20) {
+d <- as.matrix(moon.dataset[,1:2])
+#hist(d)
+mixmdl <- mvnormalmixEM(d, k = 3, epsilon=1e-04)
+
+#mixmdl$mu
+
+#mixmdl$sigma
+a <- plot(mixmdl, which=2, main2="Gaussian mixture model for the moon data set")
+a
+}
+
+#mixmdl[c("lambda", "mu", "sigma")]
+head(mixmdl$posterior)
+
+length(mixmdl$posterior)
+
+length(mixmdl$posterior)
+```
+```{r}
+library(mclust)
+mcc <- Mclust(moon.dataset[,1:2], G=3)        # Model-based-clustering
+summary(mcc)                             # Print a summary
+mcc$modelName                            # Optimal selected model ==> "VVV"
+mcc$G                                    # Optimal number of cluster => 3
+head(mcc$z, 30)                          # Probability to belong to a given cluster
+head(mcc$classification, 30)             # Cluster assignement of each observation
+library(factoextra)
+# BIC values used for choosing the number of clusters
+
+fviz_mclust(mcc, "BIC", palette = "jco")+
+  ggtitle(label="BIC evaluation of the moon data set")
+  theme_classic()
+
+# Classification: plot showing the clustering
+fviz_mclust(mcc,"classification", geom = "point",ellipse.level=0.92, main ="Model-based clustering on the moon data set", 
+            pointsize = 1.5) +
+  scale_colour_manual(values = c("blue", "green", "red")) +
+  scale_fill_manual(values = c("blue", "green", "red")) +
+  scale_shape_manual(values = c(16,17,15)) +
+  theme_classic()
+  
+# Classification uncertainty
+fviz_mclust(mcc, "uncertainty", ellipse.level = 0.92, main = "Uncertainty plot for model-based clustering on the moon data set") +
+  scale_colour_manual(values = c("blue", "green", "red")) +
+  scale_fill_manual(values = c("blue", "green", "red")) +
+  scale_shape_manual(values = c(16,17,15)) + 
+  theme_classic()
+```
+
+
+
+# Evaluate the the model by transforming it to hard clustering to fit a confusion matrix: Moon data set
+```{r}
+head(mixmdl$posterior)
+hardclustering1 <- apply(mixmdl$posterior, 1, which.max)
+table(moon.dataset[,3],hardclustering1)
+# new table for mclust
+table(moon.dataset[,3],mcc$classification)
+```
+
+#Evaluation on model based clustering with BIC: Moon data set
+```{r}
+mixmdl1 <- mvnormalmixEM(d, k = 2, epsilon=1e-04)
+
+L1 <- mixmdl1$loglik
+L1 
+
+
+bic1 <- log(1800)*6 - 2*log(abs(L1))
+bic1
+
+
+mixmdl2 <- mvnormalmixEM(d, k = 3, epsilon=1e-04)
+
+L2 <- mixmdl2$loglik
+L2 
+
+
+bic2 <- log(1800)*9 - 2*log(abs(L2))
+bic2
+
+
+mixmdl3 <- mvnormalmixEM(d, k = 4, epsilon=1e-04)
+
+L3 <- mixmdl3$loglik
+L3 
+
+
+bic3 <- log(1800)*12 - 2*log(abs(L3))
+bic3
+```
+
+
+
+
+
+
+
+#Clustering method: Gaussian Mixture Modeling: Generated data set
+```{r}
+library(mixtools)
+
+#for (i in 1:20) {
+dd <- as.matrix(mydata[,1:2])
+#hist(dd)
+mixmdla <- mvnormalmixEM(dd, k = 3, epsilon=1e-04)
+#mixmdl$mu
+#mixmdl$sigma
+
+
+                 
+aa <- plot(mixmdla, which=2,main1="Gaussian mixture model for the generated data set",col1 =c("red","green","blue"), pch = c(15,16,17)) 
+  legend("topright",legend=c("1","2","3"), pch=c(15,16,17), title="cluster")
+aa
+#}
+
+
+mixmdla[c("lambda", "mu", "sigma")]
+```
+
+```{r}
+library(mclust)
+mc <- Mclust(mydata)        # Model-based-clustering
+summary(mc)                 # Print a summary
+mc$modelName                # Optimal selected model ==> "VVV"
+mc$G                        # Optimal number of cluster => 3
+head(mc$z, 30)              # Probality to belong to a given cluster
+head(mc$classification, 30) # Cluster assignement of each observation
+library(factoextra)
+# BIC values used for choosing the number of clusters
+fviz_mclust(mc, "BIC", palette = "jco")+
+  ggtitle(label="BIC evaluation of the generated data set")
+  theme_classic()
+
+# Classification: plot showing the clustering
+fviz_mclust(mc, "classification", geom = "point",ellipse.level=0.92, main ="Model-based clustering on the generated data set", 
+            pointsize = 1.5) +
+  scale_colour_manual(values = c("blue", "red", "green")) +
+  scale_fill_manual(values = c("blue", "red", "green")) +
+  scale_shape_manual(values = c(15,17,16)) +
+  theme_classic()
+  
+# Classification uncertainty
+fviz_mclust(mc, "uncertainty", ellipse.level = 0.92, main = "Uncertainty plot for model-based clustering on the generated data set") +
+  scale_colour_manual(values = c("blue", "red", "green")) +
+  scale_fill_manual(values = c("blue", "red", "green")) +
+  scale_shape_manual(values = c(15,17,16)) + 
+  theme_classic()
+```
+# Evaluate the the model by transforming it to hard clustering to fit a confusion matrix:
+```{r}
+head(mixmdla$posterior)
+hardclustering <- apply(mixmdla$posterior, 1, which.max)
+table(classes,hardclustering)
+# new table for mclust
+table(classes,mc$classification)
+```
+
+# Evaluation of model based clustering with BIC: Generated data set
+```{r}
+mixmdla1 <- mvnormalmixEM(dd, k = 2, epsilon=1e-04)
+
+LL1 <- mixmdla1$loglik
+LL1 
+
+
+bic11 <- log(1800)*6 - 2*log(abs(LL1))
+bic11
+
+mixmdla2 <- mvnormalmixEM(dd, k = 3, epsilon=1e-04)
+
+LL2 <- mixmdla2$loglik
+LL2 
+
+
+bic22 <- log(1800)*9 - 2*log(abs(LL2))
+bic22
+
+mixmdla3 <- mvnormalmixEM(dd, k = 4, epsilon=1e-04)
+
+LL3 <- mixmdla3$loglik
+LL3
+
+
+bic33 <- log(1800)*12 - 2*log(abs(LL3))
+bic33
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
